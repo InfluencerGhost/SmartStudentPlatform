@@ -1,89 +1,23 @@
+
+import smartstudentplatform.Student;
+import smartstudentplatform.Result;
 import javax.swing.*;
+import javax.swing.table.AbstractTableModel;
 import java.awt.*;
 import java.awt.event.*;
 import java.util.*;
 
+
 public class SmartStudentPlatform extends JFrame implements ActionListener {
-    // Inner classes for OOP
-    static class Person {
-        private String name;
-        private int id;
-
-        public Person(int id, String name) {
-            this.id = id;
-            this.name = name;
-        }
-
-        public int getId() {
-            return id;
-        }
-
-        public String getName() {
-            return name;
-        }
-
-        public void setName(String name) {
-            this.name = name;
-        }
-    }
-
-    static class Result {
-        private String course;
-        private double grade;
-
-        public Result(String course, double grade) {
-            this.course = course;
-            this.grade = grade;
-        }
-
-        public String getCourse() {
-            return course;
-        }
-
-        public double getGrade() {
-            return grade;
-        }
-    }
-
-    static class Student extends Person implements Comparable<Student> {
-        private ArrayList<Result> results = new ArrayList<>();
-
-        public Student(int id, String name) {
-            super(id, name);
-        }
-
-        public void addResult(String course, double grade) {
-            results.add(new Result(course, grade));
-        }
-
-        public double getCGPA() {
-            if (results.isEmpty()) {
-                return 0.0;
-            }
-            double sum = 0.0;
-            for (Result r : results) {
-                sum += r.getGrade();
-            }
-            return sum / results.size();
-        }
-
-        public ArrayList<Result> getResults() {
-            return results;
-        }
-
-        @Override
-        public int compareTo(Student other) {
-            return Integer.compare(this.getId(), other.getId());
-        }
-    }
 
     // Data structures
     private ArrayList<Student> students = new ArrayList<>();
     private HashMap<Integer, Student> studentMap = new HashMap<>();
 
     // GUI components
-    private DefaultListModel<String> listModel;
-    private JList<String> displayList;
+    private JTable studentTable;
+    private StudentTableModel tableModel;
+    private JLabel totalLabel;
     private JTextField idField, nameField, courseField, gradeField;
     private JLabel errorLabel;
     private JButton addButton, updateButton, viewButton, sortNameButton, sortIdButton, sortCgpaButton, searchButton, summaryButton;
@@ -107,13 +41,13 @@ public class SmartStudentPlatform extends JFrame implements ActionListener {
         nameField = new JTextField();
         inputPanel.add(nameField);
 
-        inputPanel.add(new JLabel("Course:"));
-        courseField = new JTextField();
-        inputPanel.add(courseField);
+    inputPanel.add(new JLabel("Courses:"));
+    courseField = new JTextField();
+    inputPanel.add(courseField);
 
-        inputPanel.add(new JLabel("Grade:"));
-        gradeField = new JTextField();
-        inputPanel.add(gradeField);
+    inputPanel.add(new JLabel("CGPA:"));
+    gradeField = new JTextField();
+    inputPanel.add(gradeField);
 
         addButton = new JButton("Add Student");
         updateButton = new JButton("Update Student");
@@ -145,12 +79,19 @@ public class SmartStudentPlatform extends JFrame implements ActionListener {
 
         add(buttonPanel, BorderLayout.NORTH);
 
-        // Display area (center)
-        listModel = new DefaultListModel<>();
-        displayList = new JList<>(listModel);
-        displayList.setFont(new Font("Monospaced", Font.PLAIN, 12));
-        JScrollPane scrollPane = new JScrollPane(displayList);
-        add(scrollPane, BorderLayout.CENTER);
+
+    // Display area (center) with JTable
+    tableModel = new StudentTableModel();
+    studentTable = new JTable(tableModel);
+    studentTable.setFont(new Font("Monospaced", Font.PLAIN, 12));
+    studentTable.setRowHeight(22);
+    JScrollPane scrollPane = new JScrollPane(studentTable);
+    add(scrollPane, BorderLayout.CENTER);
+
+    // Total students label (bottom)
+    totalLabel = new JLabel("Total Students: 0");
+    totalLabel.setFont(new Font("Arial", Font.BOLD, 14));
+    add(totalLabel, BorderLayout.SOUTH);
 
         // Add action listeners
         addButton.addActionListener(this);
@@ -173,16 +114,16 @@ public class SmartStudentPlatform extends JFrame implements ActionListener {
         } else if (e.getSource() == updateButton) {
             updateStudent();
         } else if (e.getSource() == viewButton) {
-            viewAll();
+            updateTable();
         } else if (e.getSource() == sortNameButton) {
             sortByName();
-            viewAll();
+            updateTable();
         } else if (e.getSource() == sortIdButton) {
             sortById();
-            viewAll();
+            updateTable();
         } else if (e.getSource() == sortCgpaButton) {
             sortByCgpa();
-            viewAll();
+            updateTable();
         } else if (e.getSource() == searchButton) {
             searchStudent();
         } else if (e.getSource() == summaryButton) {
@@ -210,30 +151,38 @@ public class SmartStudentPlatform extends JFrame implements ActionListener {
                 return;
             }
 
-            String course = courseField.getText().trim();
-            if (course.isEmpty()) {
-                errorLabel.setText("Course cannot be empty!");
+            String courses = courseField.getText().trim();
+            if (courses.isEmpty()) {
+                errorLabel.setText("Courses cannot be empty!");
                 return;
             }
 
-            String gradeStr = gradeField.getText().trim();
-            if (gradeStr.isEmpty()) {
-                errorLabel.setText("Grade cannot be empty!");
+            String cgpaStr = gradeField.getText().trim();
+            if (cgpaStr.isEmpty()) {
+                errorLabel.setText("CGPA cannot be empty!");
                 return;
             }
-            double grade = Double.parseDouble(gradeStr);
+            double cgpa = Double.parseDouble(cgpaStr);
+            if (cgpa < 0.0 || cgpa > 5.0) {
+                errorLabel.setText("CGPA must be between 0.0 and 5.0!");
+                return;
+            }
 
-            // Create and add student
             Student student = new Student(id, name);
-            student.addResult(course, grade);
+            student.getResults().clear();
+            // Add each course with the same CGPA (since only one CGPA is provided)
+            String[] courseArr = courses.split(",");
+            for (String course : courseArr) {
+                student.addResult(course.trim(), cgpa);
+            }
             students.add(student);
             studentMap.put(id, student);
 
             errorLabel.setText("Student added successfully!");
             clearFields();
-            viewAll();
+            updateTable();
         } catch (NumberFormatException ex) {
-            errorLabel.setText("Invalid ID or grade! Use numbers.");
+            errorLabel.setText("Invalid ID or CGPA! Use numbers.");
         } catch (Exception ex) {
             errorLabel.setText("Error: " + ex.getMessage());
         }
@@ -258,19 +207,26 @@ public class SmartStudentPlatform extends JFrame implements ActionListener {
                 student.setName(newName);
             }
 
-            String course = courseField.getText().trim();
-            String gradeStr = gradeField.getText().trim();
-            if (!course.isEmpty() && !gradeStr.isEmpty()) {
-                double grade = Double.parseDouble(gradeStr);
+            String courses = courseField.getText().trim();
+            String cgpaStr = gradeField.getText().trim();
+            if (!courses.isEmpty() && !cgpaStr.isEmpty()) {
+                double cgpa = Double.parseDouble(cgpaStr);
+                if (cgpa < 0.0 || cgpa > 5.0) {
+                    errorLabel.setText("CGPA must be between 0.0 and 5.0!");
+                    return;
+                }
                 student.getResults().clear();
-                student.addResult(course, grade);
+                String[] courseArr = courses.split(",");
+                for (String course : courseArr) {
+                    student.addResult(course.trim(), cgpa);
+                }
             }
 
             errorLabel.setText("Student updated successfully!");
             clearFields();
-            viewAll();
+            updateTable();
         } catch (NumberFormatException ex) {
-            errorLabel.setText("Invalid ID or grade! Use numbers.");
+            errorLabel.setText("Invalid ID or CGPA! Use numbers.");
         } catch (Exception ex) {
             errorLabel.setText("Error: " + ex.getMessage());
         }
@@ -283,34 +239,53 @@ public class SmartStudentPlatform extends JFrame implements ActionListener {
         gradeField.setText("");
     }
 
-    private void viewAll() {
-        listModel.clear();
-        for (Student s : students) {
-            listModel.addElement(String.format("ID: %-8d Name: %-20s CGPA: %.2f", s.getId(), s.getName(), s.getCGPA()));
-            for (Result r : s.getResults()) {
-                listModel.addElement(String.format("    Course: %-15s Grade: %.2f", r.getCourse(), r.getGrade()));
-            }
+
+    private void updateTable() {
+        tableModel.setStudents(students);
+        totalLabel.setText("Total Students: " + students.size());
+    }
+
+    // Quicksort by name
+    private void sortByName() {
+        String[] options = {"Ascending", "Descending"};
+        int choice = JOptionPane.showOptionDialog(this, "Sort by Name:", "Sort Order",
+                JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
+        boolean ascending = (choice == 0);
+        quickSortByName(0, students.size() - 1, ascending);
+    }
+
+    private void quickSortByName(int low, int high, boolean ascending) {
+        if (low < high) {
+            int pi = partitionByName(low, high, ascending);
+            quickSortByName(low, pi - 1, ascending);
+            quickSortByName(pi + 1, high, ascending);
         }
     }
 
-    // Bubble sort by name
-    private void sortByName() {
-        for (int i = 0; i < students.size() - 1; i++) {
-            for (int j = 0; j < students.size() - i - 1; j++) {
-                if (students.get(j).getName().compareTo(students.get(j + 1).getName()) > 0) {
-                    Student temp = students.get(j);
-                    students.set(j, students.get(j + 1));
-                    students.set(j + 1, temp);
-                }
+    private int partitionByName(int low, int high, boolean ascending) {
+        String pivot = students.get(high).getName();
+        int i = low - 1;
+        for (int j = low; j < high; j++) {
+            int cmp = students.get(j).getName().compareToIgnoreCase(pivot);
+            if ((ascending && cmp <= 0) || (!ascending && cmp >= 0)) {
+                i++;
+                Collections.swap(students, i, j);
             }
         }
+        Collections.swap(students, i + 1, high);
+        return i + 1;
     }
 
     // Bubble sort by ID
     private void sortById() {
+        String[] options = {"Ascending", "Descending"};
+        int choice = JOptionPane.showOptionDialog(this, "Sort by ID:", "Sort Order",
+                JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
+        boolean ascending = (choice == 0);
         for (int i = 0; i < students.size() - 1; i++) {
             for (int j = 0; j < students.size() - i - 1; j++) {
-                if (students.get(j).getId() > students.get(j + 1).getId()) {
+                if ((ascending && students.get(j).getId() > students.get(j + 1).getId()) ||
+                    (!ascending && students.get(j).getId() < students.get(j + 1).getId())) {
                     Student temp = students.get(j);
                     students.set(j, students.get(j + 1));
                     students.set(j + 1, temp);
@@ -319,40 +294,19 @@ public class SmartStudentPlatform extends JFrame implements ActionListener {
         }
     }
 
-    // Merge sort by CGPA
+    // Bubble sort by CGPA
     private void sortByCgpa() {
-        if (students.isEmpty()) return;
-        ArrayList<Student> temp = new ArrayList<>(students.size());
-        for (int i = 0; i < students.size(); i++) {
-            temp.add(null);
-        }
-        mergeSort(0, students.size() - 1, temp);
-    }
-
-    private void mergeSort(int low, int high, ArrayList<Student> temp) {
-        if (low >= high) return;
-        int mid = (low + high) / 2;
-        mergeSort(low, mid, temp);
-        mergeSort(mid + 1, high, temp);
-        merge(low, mid, high, temp);
-    }
-
-    private void merge(int low, int mid, int high, ArrayList<Student> temp) {
-        for (int i = low; i <= high; i++) {
-            temp.set(i, students.get(i));
-        }
-        int i = low;
-        int j = mid + 1;
-        int k = low;
-        while (i <= mid && j <= high) {
-            if (temp.get(i).getCGPA() <= temp.get(j).getCGPA()) {
-                students.set(k++, temp.get(i++));
-            } else {
-                students.set(k++, temp.get(j++));
+        String[] options = {"Ascending", "Descending"};
+        int choice = JOptionPane.showOptionDialog(this, "Sort by CGPA:", "Sort Order",
+                JOptionPane.DEFAULT_OPTION, JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
+        boolean ascending = (choice == 0);
+        for (int i = 0; i < students.size() - 1; i++) {
+            for (int j = 0; j < students.size() - i - 1; j++) {
+                if ((ascending && students.get(j).getCGPA() > students.get(j + 1).getCGPA()) ||
+                    (!ascending && students.get(j).getCGPA() < students.get(j + 1).getCGPA())) {
+                    Collections.swap(students, j, j + 1);
+                }
             }
-        }
-        while (i <= mid) {
-            students.set(k++, temp.get(i++));
         }
     }
 
@@ -363,21 +317,16 @@ public class SmartStudentPlatform extends JFrame implements ActionListener {
                     JOptionPane.QUESTION_MESSAGE, null, options, options[0]);
             if (choice == null) return;
 
+            ArrayList<Student> foundStudents = new ArrayList<>();
             if (choice.equals("Linear (Name)")) {
                 String name = JOptionPane.showInputDialog("Enter name to search:");
                 if (name == null) return;
-                listModel.clear();
-                boolean found = false;
                 for (Student s : students) {
                     if (s.getName().equalsIgnoreCase(name)) {
-                        listModel.addElement(String.format("ID: %-8d Name: %-20s CGPA: %.2f", s.getId(), s.getName(), s.getCGPA()));
-                        for (Result r : s.getResults()) {
-                            listModel.addElement(String.format("    Course: %-15s Grade: %.2f", r.getCourse(), r.getGrade()));
-                        }
-                        found = true;
+                        foundStudents.add(s);
                     }
                 }
-                if (!found) {
+                if (foundStudents.isEmpty()) {
                     errorLabel.setText("Student not found!");
                 }
             } else if (choice.equals("Binary (ID)")) {
@@ -385,20 +334,13 @@ public class SmartStudentPlatform extends JFrame implements ActionListener {
                 String idStr = JOptionPane.showInputDialog("Enter ID to search:");
                 if (idStr == null) return;
                 int id = Integer.parseInt(idStr);
-
                 int low = 0;
                 int high = students.size() - 1;
-                boolean found = false;
-                listModel.clear();
                 while (low <= high) {
                     int mid = (low + high) / 2;
                     Student midStudent = students.get(mid);
                     if (midStudent.getId() == id) {
-                        listModel.addElement(String.format("ID: %-8d Name: %-20s CGPA: %.2f", midStudent.getId(), midStudent.getName(), midStudent.getCGPA()));
-                        for (Result r : midStudent.getResults()) {
-                            listModel.addElement(String.format("    Course: %-15s Grade: %.2f", r.getCourse(), r.getGrade()));
-                        }
-                        found = true;
+                        foundStudents.add(midStudent);
                         break;
                     } else if (midStudent.getId() < id) {
                         low = mid + 1;
@@ -406,10 +348,12 @@ public class SmartStudentPlatform extends JFrame implements ActionListener {
                         high = mid - 1;
                     }
                 }
-                if (!found) {
+                if (foundStudents.isEmpty()) {
                     errorLabel.setText("Student not found!");
                 }
             }
+            tableModel.setStudents(foundStudents);
+            totalLabel.setText("Total Students: " + foundStudents.size());
         } catch (NumberFormatException ex) {
             errorLabel.setText("Invalid ID! Use numbers.");
         }
@@ -417,8 +361,8 @@ public class SmartStudentPlatform extends JFrame implements ActionListener {
 
     private void showSummaries() {
         if (students.isEmpty()) {
-            listModel.clear();
-            listModel.addElement("No students!");
+            tableModel.setStudents(new ArrayList<>());
+            totalLabel.setText("No students!");
             return;
         }
         double totalCgpa = 0.0;
@@ -430,10 +374,51 @@ public class SmartStudentPlatform extends JFrame implements ActionListener {
             }
         }
         double average = totalCgpa / students.size();
-
-        listModel.clear();
-        listModel.addElement(String.format("Class Average CGPA: %.2f", average));
-        listModel.addElement(String.format("Top Performer: ID %-8d Name: %-20s CGPA: %.2f", top.getId(), top.getName(), top.getCGPA()));
+    tableModel.setStudents(new ArrayList<>(Arrays.asList(top)));
+        totalLabel.setText(String.format("Class Average CGPA: %.2f | Top Performer: %s (ID: %d, CGPA: %.2f)", average, top.getName(), top.getId(), top.getCGPA()));
     }
 
+    // Table model for JTable
+    class StudentTableModel extends AbstractTableModel {
+    private String[] columns = {"ID", "Name", "Courses", "CGPA"};
+        private ArrayList<Student> data = new ArrayList<>();
+
+        public void setStudents(ArrayList<Student> students) {
+            data = new ArrayList<>(students);
+            fireTableDataChanged();
+        }
+
+        @Override
+        public int getRowCount() {
+            return data.size();
+        }
+
+        @Override
+        public int getColumnCount() {
+            return columns.length;
+        }
+
+        @Override
+        public String getColumnName(int col) {
+            return columns[col];
+        }
+
+        @Override
+        public Object getValueAt(int row, int col) {
+            Student s = data.get(row);
+            switch (col) {
+                case 0: return s.getId();
+                case 1: return s.getName();
+                case 2:
+                    StringBuilder sb = new StringBuilder();
+                    for (Result r : s.getResults()) {
+                        sb.append(r.getCourse()).append(", ");
+                    }
+                    if (sb.length() > 2) sb.setLength(sb.length() - 2); // remove last comma
+                    return sb.toString();
+                case 3: return String.format("%.2f", s.getCGPA());
+                default: return "";
+            }
+        }
+    }
 }
